@@ -147,11 +147,16 @@ def ElencoNodi(cl):
 def TimeoutNodi(cl):
   while True:
     time.sleep(1)
+    # Create list of items to remove (avoid modifying list during iteration)
+    to_remove = []
     for c in cl:
       c[3] += 1
       if (c[3] > 60):
         printlog(1, 'Removing ' + c[2].ljust(10) + ' (' + c[0] + ':' + str(c[1]) + ') disappeared')
-        cl.remove(c)
+        to_remove.append(c)
+    # Remove items after iteration
+    for c in to_remove:
+      cl.remove(c)
 
 
 def TimeoutTX(t, t_lock, r_lock, lista_lh, lista_lhd, t_out, t_react):
@@ -216,21 +221,22 @@ def scheduler():
 def ckeck_wild_ptt(cs, tw, cnt, trea):
   global W_PTT
   global BLK_TMP
+  global SCHED
   n = 0
   tc = time.time()
   W_PTT.append([cs, tc])
+  # Remove old entries (avoid modifying list during iteration)
+  W_PTT[:] = [r for r in W_PTT if r[1] >= (tc - tw)]
+  # Count occurrences of this callsign
   for r in W_PTT:
-    if (r[1] < (tc - tw)):
-      W_PTT.remove(r)
-    else:
-      if (r[0] == cs):
-        n += 1  
+    if (r[0] == cs):
+      n += 1  
   if (n >= cnt):
-    printlog(1, 'Wild-PTT ' + r[0])
-    if (not inlist(BLK_TMP, r[0])):
-        bisect.insort(BLK_TMP,r[0])  
-        SCHED.append([r[0], 'RC', tc + trea])
-        printlog(1, 'Appended scheduled job: ' + r[0] + '/RC at time '  + time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(tc + trea)))
+    printlog(1, 'Wild-PTT ' + cs)
+    if (not inlist(BLK_TMP, cs)):
+        bisect.insort(BLK_TMP, cs)  
+        SCHED.append([cs, 'RC', tc + trea])
+        printlog(1, 'Appended scheduled job: ' + cs + '/RC at time '  + time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(tc + trea)))
 
   
 def canTrasmit(cs, re_en):
@@ -646,14 +652,19 @@ def RunServer(config):
               s.sendto(b'YSFPREFLECTOR ',addr)
            
             if (cmd == b'YSFU'):
+               client_to_remove = None
                for c in clients:
                 if ((c[0] == addr[0]) and (c[1] == addr[1])):
-                  printlog(1, 'Removing ' + c[2].ljust(10) + ' (' + c[0] + ':' + str(c[1]) + ') unlinked')
-                  clients.remove(c)
+                  client_to_remove = c
                   break
+               if client_to_remove is not None:
+                 printlog(1, 'Removing ' + client_to_remove[2].ljust(10) + ' (' + client_to_remove[0] + ':' + str(client_to_remove[1]) + ') unlinked')
+                 clients.remove(client_to_remove)
               
             if ((cmd == b'YSFD') and (len(data) == 155)):
               [id_corr, gw_corr] = getidgw(clients, addr)
+              tx_ok = True
+              block_r = ''
               if (tx[0] == 0):
                 if (inlist(GW_BL, gw_corr) or inlist(GW_LK, gw_corr)):
                   tx_ok = False
@@ -836,17 +847,19 @@ def printlog(log_level, mess):
   except:
     pass
     
+  str_log = None
   if isinstance(log_level, int):
     if file_level <= log_level:
       str_log = check_string('M: ' + str(datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%d %H:%M:%S.%f'))[:-3] + ' ' + mess)
   else:
     if log_level == "d" and debug == 1:
       str_log = check_string('D: ' + str(datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%d %H:%M:%S.%f'))[:-3] + ' ' + mess)
-  try:
-    filelog.write(str_log + '\n') 
-    filelog.flush()
-  except:
-    pass  
+  if str_log is not None:
+    try:
+      filelog.write(str_log + '\n') 
+      filelog.flush()
+    except:
+      pass  
 
 
 def hex_dump(data):
