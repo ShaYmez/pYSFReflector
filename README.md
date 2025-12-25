@@ -70,7 +70,7 @@ In most installations this packages are already installed, otherwise you easily 
 
 The configuration file (YSFReflector.ini) is based on the origin YSFReflector.ini of G4KLX's YSFReflector but with added new configuration-items. So If you know the old reflector-software - configuring this one would be straight forward.
 
-## Best Practise Installation
+## Best Practice Installation
 For getting the best user experience it is recommended to configure your pYSFReflector with the following parameter in the YSFReflector.ini:
 
 `FileRotate=0`
